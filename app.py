@@ -17,7 +17,11 @@ app = Flask(__name__)
 CORS(app)
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "template.xlsx")
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# Fix DATABASE_URL for psycopg2 compatibility
+raw_url = os.environ.get("DATABASE_URL", "")
+if raw_url.startswith("postgres://"):
+    raw_url = raw_url.replace("postgres://", "postgresql://", 1)
+DATABASE_URL = raw_url or None
 
 # ── Database setup ────────────────────────────────────────────
 def get_db():
