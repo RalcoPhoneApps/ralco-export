@@ -833,6 +833,38 @@ def save_job_legacy():
 def get_job_legacy(job_id):
     return get_site(job_id)
 
+
+# ── One-time cleanup ─────────────────────────────────────────
+@app.route("/admin/clear-migrated", methods=["POST"])
+def clear_migrated():
+    """Delete all records migrated from old job format (id starts with job_)"""
+    if not DATABASE_URL:
+        return jsonify({"error": "No DB"}), 503
+    try:
+        conn = get_db(); cur = conn.cursor()
+        # Delete assets from migrated sites
+        cur.execute("DELETE FROM assets WHERE site_id LIKE 'job_%'")
+        assets_deleted = cur.rowcount
+        # Delete years from migrated contracts
+        cur.execute("DELETE FROM years WHERE contract_id LIKE 'c1_job_%'")
+        years_deleted = cur.rowcount
+        # Delete migrated contracts
+        cur.execute("DELETE FROM contracts WHERE id LIKE 'c1_job_%'")
+        contracts_deleted = cur.rowcount
+        # Delete migrated sites
+        cur.execute("DELETE FROM sites WHERE id LIKE 'job_%'")
+        sites_deleted = cur.rowcount
+        conn.commit(); cur.close(); conn.close()
+        return jsonify({
+            "status": "cleared",
+            "sites": sites_deleted,
+            "contracts": contracts_deleted,
+            "years": years_deleted,
+            "assets": assets_deleted
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
