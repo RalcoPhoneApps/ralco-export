@@ -865,6 +865,24 @@ def clear_migrated():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/admin/wipe-all", methods=["POST"])
+def wipe_all():
+    """Wipe all data for a clean start"""
+    if not DATABASE_URL:
+        return jsonify({"error": "No DB"}), 503
+    try:
+        conn = get_db(); cur = conn.cursor()
+        cur.execute("DELETE FROM assets")
+        cur.execute("DELETE FROM years")
+        cur.execute("DELETE FROM contracts")
+        cur.execute("DELETE FROM sites")
+        cur.execute("DELETE FROM meta")
+        conn.commit(); cur.close(); conn.close()
+        return jsonify({"status": "wiped", "message": "All data cleared"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
