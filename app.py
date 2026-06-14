@@ -607,6 +607,31 @@ def export_sales():
                 for col_idx in col_indices:
                     ws_c1.cell(row=row_num, column=col_idx+1, value=qty)
 
+        # Write pricing to Totals sheet yellow cells
+        pricing = payload.get("pricing", {})
+        if pricing and "Totals" in wb.sheetnames:
+            ws_tot = wb["Totals"]
+            try:
+                faf_y1 = float(pricing.get("fafY1", 1.00))
+                faf_y2 = float(pricing.get("fafY2", 1.00))
+                faf_y3 = float(pricing.get("fafY3", 1.00))
+                nfpa   = int(float(pricing.get("nfpaSeats", 0) or 0))
+                margin = pricing.get("targetMargin", "")
+                # Facility Access Factor — col D rows 6,7,8 (Y1,Y2,Y3)
+                ws_tot.cell(row=6, column=4, value=faf_y1)
+                ws_tot.cell(row=7, column=4, value=faf_y2)
+                ws_tot.cell(row=8, column=4, value=faf_y3)
+                # NFPA 70E seats — col N row 6 (Y1 only)
+                ws_tot.cell(row=6, column=14, value=nfpa)
+                # Target margin — col P rows 6,7,8
+                if margin:
+                    margin_val = float(margin) / 100
+                    ws_tot.cell(row=6, column=16, value=margin_val)
+                    ws_tot.cell(row=7, column=16, value=margin_val)
+                    ws_tot.cell(row=8, column=16, value=margin_val)
+            except Exception as pe:
+                app.logger.warning(f"Pricing write error: {pe}")
+
         buffer = io.BytesIO()
         wb.save(buffer); buffer.seek(0)
         customer = site.get("customer","Job")
