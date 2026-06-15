@@ -129,6 +129,10 @@ def init_db():
         cur.execute("""
             ALTER TABLE sites ADD COLUMN IF NOT EXISTS walkthrough_total INTEGER DEFAULT 0
         """)
+        # Add walkthrough_data column if it doesn't exist (migration)
+        cur.execute("""
+            ALTER TABLE sites ADD COLUMN IF NOT EXISTS walkthrough_data JSONB DEFAULT '{}'
+        """)
 
         # Migrate old jobs table if it exists
         cur.execute("""
@@ -300,7 +304,7 @@ def get_site(site_id):
     if not DATABASE_URL: return jsonify({"error": "No DB"}), 503
     try:
         conn = get_db(); cur = conn.cursor()
-        cur.execute("SELECT id, customer, address, contact, phone, notes, device_id, device_name, created_at, updated_at FROM sites WHERE id=%s AND deleted=FALSE", (site_id,))
+        cur.execute("SELECT id, customer, address, contact, phone, notes, device_id, device_name, created_at, updated_at, walkthrough_data FROM sites WHERE id=%s AND deleted=FALSE", (site_id,))
         s = cur.fetchone()
         if not s: return jsonify({"error": "Not found"}), 404
 
@@ -330,12 +334,22 @@ def get_site(site_id):
             })
 
         cur.close(); conn.close()
+        wt = s[10] or {}
         return jsonify({
             "id":s[0],"customer":s[1],"address":s[2],"contact":s[3],"phone":s[4],
             "notes":s[5],"deviceId":s[6],"deviceName":s[7],
             "createdAt":s[8].isoformat() if s[8] else None,
             "updatedAt":s[9].isoformat() if s[9] else None,
             "contracts": contracts,
+            # Walkthrough data
+            "buildings":       wt.get("buildings", []),
+            "rooms":           wt.get("rooms", []),
+            "walkthroughDate": wt.get("walkthroughDate", ""),
+            "walkthroughRep":  wt.get("walkthroughRep", ""),
+            "walkthroughTier": wt.get("walkthroughTier", "basic"),
+            "pricing":         wt.get("pricing", {}),
+            "fieldNotes":      wt.get("fieldNotes", ""),
+            "observations":    wt.get("observations", ""),
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -352,19 +366,31 @@ def save_site():
 
         conn = get_db(); cur = conn.cursor()
         wt_total = int(s.get("walkthroughTotal", 0) or 0)
+        # Store all walkthrough-specific data as JSON
+        wt_data = {
+            'buildings':       s.get('buildings', []),
+            'rooms':           s.get('rooms', []),
+            'walkthroughDate': s.get('walkthroughDate', ''),
+            'walkthroughRep':  s.get('walkthroughRep', ''),
+            'walkthroughTier': s.get('walkthroughTier', 'basic'),
+            'pricing':         s.get('pricing', {}),
+            'fieldNotes':      s.get('fieldNotes', ''),
+            'observations':    s.get('observations', ''),
+        }
         cur.execute("""
-            INSERT INTO sites (id, customer, address, contact, phone, notes, device_id, device_name, walkthrough_total, updated_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+            INSERT INTO sites (id, customer, address, contact, phone, notes, device_id, device_name, walkthrough_total, walkthrough_data, updated_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
             ON CONFLICT (id) DO UPDATE SET
                 customer=EXCLUDED.customer, address=EXCLUDED.address,
                 contact=EXCLUDED.contact, phone=EXCLUDED.phone,
                 notes=EXCLUDED.notes, device_id=EXCLUDED.device_id,
                 device_name=EXCLUDED.device_name,
                 walkthrough_total=EXCLUDED.walkthrough_total,
+                walkthrough_data=EXCLUDED.walkthrough_data,
                 updated_at=NOW()
         """, (s["id"],s.get("customer",""),s.get("address",""),
               s.get("contact",""),s.get("phone",""),s.get("notes",""),
-              device_id, device_name, wt_total))
+              device_id, device_name, wt_total, json.dumps(wt_data)))
         conn.commit(); cur.close(); conn.close()
         return jsonify({"status":"saved","id":s["id"]})
     except Exception as e:
