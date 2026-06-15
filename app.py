@@ -125,6 +125,11 @@ def init_db():
             )
         """)
 
+        # Add walkthrough_total column if it doesn't exist (migration)
+        cur.execute("""
+            ALTER TABLE sites ADD COLUMN IF NOT EXISTS walkthrough_total INTEGER DEFAULT 0
+        """)
+
         # Migrate old jobs table if it exists
         cur.execute("""
             SELECT EXISTS (
