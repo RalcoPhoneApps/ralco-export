@@ -269,12 +269,13 @@ def list_sites():
         cur.execute("""
             SELECT s.id, s.customer, s.address, s.device_name, s.updated_at,
                    COUNT(DISTINCT c.id) as contract_count,
-                   COUNT(DISTINCT a.id) as asset_count
+                   COUNT(DISTINCT a.id) as asset_count,
+                   s.walkthrough_total
             FROM sites s
             LEFT JOIN contracts c ON c.site_id = s.id AND c.deleted = FALSE
             LEFT JOIN assets a ON a.site_id = s.id AND a.deleted = FALSE
             WHERE s.deleted = FALSE
-            GROUP BY s.id, s.customer, s.address, s.device_name, s.updated_at
+            GROUP BY s.id, s.customer, s.address, s.device_name, s.updated_at, s.walkthrough_total
             ORDER BY s.updated_at DESC
         """)
         rows = cur.fetchall()
@@ -283,7 +284,8 @@ def list_sites():
             "id": r[0], "customer": r[1], "address": r[2],
             "deviceName": r[3],
             "updatedAt": r[4].isoformat() if r[4] else None,
-            "contractCount": r[5], "assetCount": r[6]
+            "contractCount": r[5], "assetCount": r[6],
+            "walkthroughTotal": r[7] or 0
         } for r in rows])
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -344,17 +346,20 @@ def save_site():
         if not s.get("id"): return jsonify({"error": "No site id"}), 400
 
         conn = get_db(); cur = conn.cursor()
+        wt_total = int(s.get("walkthroughTotal", 0) or 0)
         cur.execute("""
-            INSERT INTO sites (id, customer, address, contact, phone, notes, device_id, device_name, updated_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+            INSERT INTO sites (id, customer, address, contact, phone, notes, device_id, device_name, walkthrough_total, updated_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
             ON CONFLICT (id) DO UPDATE SET
                 customer=EXCLUDED.customer, address=EXCLUDED.address,
                 contact=EXCLUDED.contact, phone=EXCLUDED.phone,
                 notes=EXCLUDED.notes, device_id=EXCLUDED.device_id,
-                device_name=EXCLUDED.device_name, updated_at=NOW()
+                device_name=EXCLUDED.device_name,
+                walkthrough_total=EXCLUDED.walkthrough_total,
+                updated_at=NOW()
         """, (s["id"],s.get("customer",""),s.get("address",""),
               s.get("contact",""),s.get("phone",""),s.get("notes",""),
-              device_id, device_name))
+              device_id, device_name, wt_total))
         conn.commit(); cur.close(); conn.close()
         return jsonify({"status":"saved","id":s["id"]})
     except Exception as e:
