@@ -344,12 +344,14 @@ def get_site(site_id):
             # Walkthrough data
             "buildings":       wt.get("buildings", []),
             "rooms":           wt.get("rooms", []),
+            "contacts":        wt.get("contacts", []),
             "walkthroughDate": wt.get("walkthroughDate", ""),
             "walkthroughRep":  wt.get("walkthroughRep", ""),
             "walkthroughTier": wt.get("walkthroughTier", "basic"),
             "pricing":         wt.get("pricing", {}),
             "fieldNotes":      wt.get("fieldNotes", ""),
             "observations":    wt.get("observations", ""),
+            "status":          wt.get("status", ""),
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -370,12 +372,14 @@ def save_site():
         wt_data = {
             'buildings':       s.get('buildings', []),
             'rooms':           s.get('rooms', []),
+            'contacts':        s.get('contacts', []),
             'walkthroughDate': s.get('walkthroughDate', ''),
             'walkthroughRep':  s.get('walkthroughRep', ''),
             'walkthroughTier': s.get('walkthroughTier', 'basic'),
             'pricing':         s.get('pricing', {}),
             'fieldNotes':      s.get('fieldNotes', ''),
             'observations':    s.get('observations', ''),
+            'status':          s.get('status', ''),
         }
         cur.execute("""
             INSERT INTO sites (id, customer, address, contact, phone, notes, device_id, device_name, walkthrough_total, walkthrough_data, updated_at)
